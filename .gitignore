@@ -1,0 +1,9 @@
+*.pyc
+output/
+PaddleGAN/
+log/
+train_datasets/
+core*
+*.zip
+test/
+.vscode
