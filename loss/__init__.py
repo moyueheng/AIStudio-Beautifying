@@ -1,1 +1,3 @@
-from .loss import PSNRLoss, MS_SSIMLoss, SSIMLoss
+
+from .psnr_loss import PSNRLoss
+from .ssmi_loss import SSIMLoss

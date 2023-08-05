@@ -1,67 +1,51 @@
 import paddle
 import os
+from os.path import join as pjoin
 import cv2
 
 
-# 定义数据读取器
 class MyDateset(paddle.io.Dataset):
-    # 构造函数，初始化数据集
-    # mode: 模式，'train'或者其他
-    # watermark_dir: 水印图像的路径
-    # bg_dir: 背景（或者说是标签）图像的路径
-    def __init__(
-        self,
-        mode="train",
-        watermark_dir="/jinx/AIStudio/Beautifying/train_datasets/image/",
-        bg_dir="/jinx/AIStudio/Beautifying/train_datasets/groundtruth/",
-    ):
-        # 调用父类的构造函数
+    def __init__(self, root_dir='/jinx/AIStudio/Beautifying/train_datasets'):
         super(MyDateset, self).__init__()
-        # 初始化模式
-        self.mode = mode
-        # 初始化水印图像的路径, 有水印的图片就是有痘痘的图片
-        self.watermark_dir = watermark_dir
-        # 初始化背景图像的路径, 背景图片我们可以认为就是没有痘痘的图片
-        self.bg_dir = bg_dir
-        # 获取水印图像的文件列表
-        self.train_list = os.listdir(self.watermark_dir)
+
+        self.root_dir = root_dir
+        # 要根据mask生成img
+        self.img_dir = pjoin(root_dir, 'groundtruth')  # 没痘痘的
+        self.mask_dir = pjoin(root_dir, 'image')  # 有痘痘的
+        self.file_list = os.listdir(self.img_dir)
 
     def __getitem__(self, index):
-        """获取单个元素
 
-        Args:
-            index (int): 
+        img_path = pjoin(self.img_dir, self.file_list[index])
+        mask_path = pjoin(self.mask_dir, self.file_list[index])
 
-        Returns:
-            tensor: (3,512,512) 有痘痘
-            tensor: (3,512,512) 没痘痘
-        """
-        # 获取每一个有痘痘的图片
-        item = self.train_list[index]
-        # print(item)
-        bg_item = self.train_list[index]
-        img = cv2.imread(self.watermark_dir + item)
-        # 没痘痘的图片
-        label = cv2.imread(self.bg_dir + bg_item)
-        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        # label = cv2.cvtColor(label, cv2.COLOR_BGR2RGB)
-        # 图片放缩
-        img = paddle.vision.transforms.resize(
-            img, (512, 512), interpolation="bilinear"
-        )  # 有痘痘
-        label = paddle.vision.transforms.resize(
-            label, (512, 512), interpolation="bilinear"
-        )  # 没痘痘
-        # 对图像进行转置，使其从HWC变为CHW
-        img = img.transpose((2, 0, 1))  # (3,512,512)
-        label = label.transpose((2, 0, 1))  # (3,512,512)
-        # 将图像的像素值归一化到[0,1]
-        img = img / 255
-        label = label / 255
-        # # 将numpy数组转为Paddle的Tensor，并设置数据类型为float32
-        img = paddle.to_tensor(img).astype("float32")
-        label = paddle.to_tensor(label).astype("float32")
-        return img, label
+        img = cv2.imread(img_path)
+        img = cv2.resize(img, (512, 512))  # （宽，高）
+        img = img/255
+        img = img.transpose([2, 0, 1])
+        img = paddle.to_tensor(img).astype('float32')
+
+        mask = cv2.imread(mask_path)
+        mask = cv2.resize(mask, (512, 512))  # （宽，高）
+        mask = mask/255
+        mask = mask.transpose([2, 0, 1])
+        mask = paddle.to_tensor(mask).astype('float32')
+
+        return img, mask
 
     def __len__(self):
-        return len(self.train_list)
+        return len(self.file_list)
+
+
+if __name__ == '__main__':
+    dataset = MyDateset()
+    dataloader = paddle.io.DataLoader(
+        dataset,
+        batch_size=16,
+        shuffle=True,
+        drop_last=False)
+
+    for step, data in enumerate(dataloader):
+        img, mask = data
+        print(step, img.shape, mask.shape)
+        break
